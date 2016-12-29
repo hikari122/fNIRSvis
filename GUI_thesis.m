@@ -100,7 +100,7 @@ global numchan numtrail hbo hb label i
 i = 0;
 
 %% ============================= load file ================================
-[filename pathname] = uigetfile({'*.txt'},'File Selector');
+[filename pathname] = uigetfile({'*.mat'},'File Selector');
 fullfilename= strcat(pathname, filename);
 loadvar = load(fullfilename);                           
 set(handles.browserfile_edit,'String',fullfilename);    %show link of data file
