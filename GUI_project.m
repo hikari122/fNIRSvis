@@ -22,7 +22,7 @@ function varargout = GUI_project(varargin)
 
 % Edit the above text to modify the response to help GUI_project
 
-% Last Modified by GUIDE v2.5 30-Dec-2016 20:00:00
+% Last Modified by GUIDE v2.5 03-Jan-2017 22:55:52
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -54,7 +54,8 @@ function GUI_project_OpeningFcn(hObject, eventdata, handles, varargin)
 
 % Choose default command line output for GUI_project
 handles.output = hObject;
-
+handles.params.ts = 0.055;  % TODO: load param from file
+handles.params.Fs = 1/handles.params.ts;
 
 
 % Update handles structure
@@ -91,11 +92,11 @@ function browser_file_Callback(hObject, eventdata, handles)
 %% ========================= declare variable =============================
 global numchan numtrial hbo hb label i
 % numchan:      number of channel
-% numtrial:     number of trail
+% numtrial:     number of trial
 % hbo:          data oxygenated hemoglobin
 % hb:           data deoxygenated hemoglobin
-%label:         data label of trail
-% i:            show number of trail is plotted now (default = 1)
+%label:         data label of trial
+% i:            show number of trial is plotted now (default = 1)
 
 i = 0;
 
@@ -158,11 +159,11 @@ function browserfile_edit_Callback(hObject, eventdata, handles)
 %% ========================= declare variable =============================
 global numchan numtrial hbo hb label i
 % numchan:      number of channel
-% numtrial:     number of trail
+% numtrial:     number of trial
 % hbo:          data oxygenated hemoglobin
 % hb:           data deoxygenated hemoglobin
-%label:         data label of trail
-% i:            show number of trail is plotted now (default = 1)
+%label:         data label of trial
+% i:            show number of trial is plotted now (default = 1)
 
 i = 0;
 
@@ -256,11 +257,11 @@ global numchan numtrial hb hbo label
 
 %% ======================== checking choosen file =========================
 getfile = get(handles.browserfile_edit,'String');
-                    %get state of browser file
+%get state of browser file
 if isempty(getfile) == 1
     set(handles.message_text,'String','No file chosen');
 else
-%% ============================ Start plotting ============================
+    %% ============================ Start plotting ============================
     set(handles.message_text,'String','');
     
     if i > numtrial;       %check value of i, if i >= numtrial disp error, else plotting
@@ -270,39 +271,67 @@ else
         set(handles.message_text,'String','plotting first trail');
         i = 1;
     else
-        set(handles.trail_text,'String',num2str(i));    %display number of current trail
+        set(handles.trial_text,'String',num2str(i));    %display number of current trail
         set(handles.label_text,'String',label(i));      %display label of trail
-
+        
         for j = 1:numchan
-        %% declare global axes
+            %% declare global axes
             public_ha_before = sprintf('global ha%d',j);
             eval(public_ha_before);
             public_ha_after = sprintf('global ha%d',j+numchan);
             eval(public_ha_after);
-
-        %% reset axes
+            
+            %% reset axes
             eval(sprintf('hcp%d = cla(ha%d,''reset'');',j,j));
             eval(sprintf('hcp%d = cla(ha%d,''reset'');',j+numchan,j+numchan));
-
-        %% start plot
-            %plot all data in channel %d of variable hbo and hb in trail i 
-            %and hanled them by hp%d 
-            a = sprintf('hp%d = plot(ha%d,hb(:,%d,%d));hold(ha%d,''on'');', j,j,i,j+1,j);
-            b = sprintf('hp%d = plot(ha%d,hbo(:,%d,%d), ''r-'');', j,j,i,j+1); 
+            
+            % ======================== plot RAW data =====================
+            % all data in channel %d of variable hbo and hb in trial i
+            %and hanled them by hp%d
+            eval(sprintf('hb_cur = hb(:,%d,%d);', i, j+1));
+            eval(sprintf('hbo_cur = hbo(:,%d,%d);', i, j+1));
+            a = sprintf('hp%d = plot(ha%d, hb_cur); hold(ha%d, ''on'');', j,j,j);
+            b = sprintf('hp%d = plot(ha%d, hbo_cur, ''r-'');', j,j);
             eval(a);
             eval(b);
-
-            %plot all data in channel (%d+numchan) of variable hbo and hb in trail i 
+            
+            %% ======================== PROCESS DATA =====================
+            hb_filt = signal_processing(handles, hb_cur);
+            hbo_filt = signal_processing(handles, hbo_cur);
+            
+            hb_shift2zero = bsxfun(@minus, hb_filt', hb_filt(1))';
+            hbo_shift2zero = bsxfun(@minus, hbo_filt', hbo_filt(1))';
+            
+            % ======================= plot PROCESSED data ================
+            % all data in channel (%d+numchan) of variable hbo and hb in trial i
             %and hanled them by hp(%d+numchan)
-            c = sprintf('hp%d = plot(ha%d,hb(:,%d,%d));hold(ha%d,''on'');', j+numchan,j+numchan,i,j+1,j+numchan);
-            d = sprintf('hp%d = plot(ha%d,hbo(:,%d,%d), ''r-'');', j+numchan,j+numchan,i,j+1);
+            c = sprintf('hp%d = plot(ha%d, hb_shift2zero); hold(ha%d, ''on'');', j+numchan,j+numchan,j+numchan);
+            d = sprintf('hp%d = plot(ha%d, hbo_shift2zero, ''r-'');', j+numchan,j+numchan);
             eval(c);
             eval(d);
-
+            
         end
     end
 end
 
+function y = signal_processing(handles, x)
+% parameters
+Fs = handles.params.Fs;
+bandpassFc = str2num(get(handles.edit_bandpassFc, 'String'));   % [highpassFc lowpassFc]
+mva_val = str2double(get(handles.edit_mva_val, 'String'));         % moving average
+span = str2double(get(handles.edit_span, 'String'));
+
+% Bandpass filter
+[b, a] = ellip(4, 0.1, 40, bandpassFc*2/Fs);   % This set of parameter is optimized for our study by trial-and-error, don't ask!
+x = filtfilt(b, a, x);
+
+% Moving average
+a = 1;
+b(1:ceil(Fs*mva_val)) = 1 / (Fs*mva_val);
+x = filtfilt(b, a, x);
+
+% Smoothing
+y = smooth(x, span);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -313,8 +342,8 @@ function label_text_CreateFcn(hObject, eventdata, handles)
 
 
 % --- Executes during object creation, after setting all properties.
-function trail_text_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to trail_text (see GCBO)
+function trial_text_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to trial_text (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -331,3 +360,94 @@ function message_text_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to message_text (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
+
+
+function edit_bandpassFc_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_bandpassFc (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit_bandpassFc as text
+%        str2double(get(hObject,'String')) returns contents of edit_bandpassFc as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit_bandpassFc_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit_bandpassFc (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function edit_mva_val_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_mva_val (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit_mva_val as text
+%        str2double(get(hObject,'String')) returns contents of edit_mva_val as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit_mva_val_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit_mva_val (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function edit6_Callback(hObject, eventdata, handles)
+% hObject    handle to edit6 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit6 as text
+%        str2double(get(hObject,'String')) returns contents of edit6 as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit6_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit6 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function edit_span_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_span (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit_span as text
+%        str2double(get(hObject,'String')) returns contents of edit_span as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit_span_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit_span (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
