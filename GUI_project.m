@@ -22,7 +22,7 @@ function varargout = GUI_project(varargin)
 
 % Edit the above text to modify the response to help GUI_project
 
-% Last Modified by GUIDE v2.5 03-Jan-2017 22:55:52
+% Last Modified by GUIDE v2.5 04-Jan-2017 14:48:17
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -57,7 +57,11 @@ handles.output = hObject;
 handles.params.ts = 0.055;  % TODO: load param from file
 handles.params.Fs = 1/handles.params.ts;
 
-
+% ================= add depedencies ==============================
+path_vis = './functions/visualization';
+disp('+++ Add path +++');
+fprintf('+ Visualization: %s\n', path_vis); addpath(path_vis);
+disp('+++ Done +++++++');
 % Update handles structure
 guidata(hObject, handles);
 
@@ -90,7 +94,7 @@ function browser_file_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 %% ========================= declare variable =============================
-global numchan numtrial hbo hb label i
+global numchan numtrial hbo hb label i numsamp
 % numchan:      number of channel
 % numtrial:     number of trial
 % hbo:          data oxygenated hemoglobin
@@ -114,8 +118,10 @@ else
     hbo = loadvar.hbo;                      %file data contain variable hbo, hb, label
     hb = loadvar.hb;
     label = loadvar.label;
-    numchan = length(hbo(1,1,2:end));
-    numtrial = length(hbo(1,:,1));
+%     numchan = length(hbo(1,1,2:end));
+    numchan = size(hbo, 3);
+    numtrial = size(hbo, 2);
+    numsamp = size(hbo, 1);
 
     set(handles.numtrial_text,'String',num2str(numtrial));
 
@@ -147,6 +153,11 @@ else
         eval(public_ha_after);
         eval(after);
     end
+    
+    % ============== Set up listbox ==================================
+    list_labels = unique(cellstr(label));
+    set(handles.lb_label1,'String', list_labels);
+    set(handles.lb_label2,'String', list_labels);
 end
 
 
@@ -252,7 +263,7 @@ plot_raw_signal(handles, i)
 
 function plot_raw_signal(handles, i)
 % ===============================================-=========================
-global numchan numtrial hb hbo label
+global numchan numtrial hb hbo label numsamp
 % =========================================================================
 
 %% ======================== checking choosen file =========================
@@ -288,50 +299,28 @@ else
             % ======================== plot RAW data =====================
             % all data in channel %d of variable hbo and hb in trial i
             %and hanled them by hp%d
-            eval(sprintf('hb_cur = hb(:,%d,%d);', i, j+1));
-            eval(sprintf('hbo_cur = hbo(:,%d,%d);', i, j+1));
+            eval(sprintf('hb_cur = hb(:,%d,%d);', i, j));
+            eval(sprintf('hbo_cur = hbo(:,%d,%d);', i, j));
             a = sprintf('hp%d = plot(ha%d, hb_cur); hold(ha%d, ''on'');', j,j,j);
-            b = sprintf('hp%d = plot(ha%d, hbo_cur, ''r-'');', j,j);
+            b = sprintf('hp%d = plot(ha%d, hbo_cur, ''r-''); xlim(ha%d, [0 numsamp]);', j,j,j);
             eval(a);
             eval(b);
             
             %% ======================== PROCESS DATA =====================
             hb_filt = signal_processing(handles, hb_cur);
             hbo_filt = signal_processing(handles, hbo_cur);
-            
-            hb_shift2zero = bsxfun(@minus, hb_filt', hb_filt(1))';
-            hbo_shift2zero = bsxfun(@minus, hbo_filt', hbo_filt(1))';
-            
+         
             % ======================= plot PROCESSED data ================
             % all data in channel (%d+numchan) of variable hbo and hb in trial i
             %and hanled them by hp(%d+numchan)
-            c = sprintf('hp%d = plot(ha%d, hb_shift2zero); hold(ha%d, ''on'');', j+numchan,j+numchan,j+numchan);
-            d = sprintf('hp%d = plot(ha%d, hbo_shift2zero, ''r-'');', j+numchan,j+numchan);
+            c = sprintf('hp%d = plot(ha%d, hb_filt); hold(ha%d, ''on'');', j+numchan,j+numchan,j+numchan);
+            d = sprintf('hp%d = plot(ha%d, hbo_filt, ''r-''); xlim(ha%d, [0 numsamp]);', j+numchan,j+numchan, j+numchan);
             eval(c);
             eval(d);
             
         end
     end
 end
-
-function y = signal_processing(handles, x)
-% parameters
-Fs = handles.params.Fs;
-bandpassFc = str2num(get(handles.edit_bandpassFc, 'String'));   % [highpassFc lowpassFc]
-mva_val = str2double(get(handles.edit_mva_val, 'String'));         % moving average
-span = str2double(get(handles.edit_span, 'String'));
-
-% Bandpass filter
-[b, a] = ellip(4, 0.1, 40, bandpassFc*2/Fs);   % This set of parameter is optimized for our study by trial-and-error, don't ask!
-x = filtfilt(b, a, x);
-
-% Moving average
-a = 1;
-b(1:ceil(Fs*mva_val)) = 1 / (Fs*mva_val);
-x = filtfilt(b, a, x);
-
-% Smoothing
-y = smooth(x, span);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -447,6 +436,166 @@ function edit_span_CreateFcn(hObject, eventdata, handles)
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on selection change in lb_label1.
+function lb_label1_Callback(hObject, eventdata, handles)
+% hObject    handle to lb_label1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns lb_label1 contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from lb_label1
+
+
+% --- Executes during object creation, after setting all properties.
+function lb_label1_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to lb_label1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: listbox controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in pb_plot_mean.
+function pb_plot_mean_Callback(hObject, eventdata, handles)
+% hObject    handle to pb_plot_mean (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global label numchan
+
+%% ======================== PROCESS DATA =====================
+[hb_filt_all, hbo_filt_all] = signalprocessing_all(handles);
+
+disp('+++ Start ploting folded average +++');
+all_labels = get(handles.lb_label1, 'String');
+slc_label1 = all_labels(get(handles.lb_label1, 'Value'));
+slc_label2 = all_labels(get(handles.lb_label2, 'Value'));
+
+figure('Name', 'Folded average');
+for ch = 1:numchan
+    subplot(1, numchan, ch);
+    hb_options = get(handles.lb_hbtype, 'String');
+    hb_slc = hb_options(get(handles.lb_hbtype, 'Value'));
+    
+    if strcmp(hb_slc, 'oxyHb')
+        hbo_slc1 = hbo_filt_all(:, ismember(label, slc_label1), ch);
+        hbo_slc2 = hbo_filt_all(:, ismember(label, slc_label2), ch);
+        plot_avg(hbo_slc1', handles.params.ts, 2); hold on;
+        plot_avg(hbo_slc2', handles.params.ts, 1); hold off;
+    elseif strcmp(hb_slc, 'deoHb')
+        hb_slc1 = hb_filt_all(:, ismember(label, slc_label1), ch);
+        hb_slc2 = hb_filt_all(:, ismember(label, slc_label2), ch);
+        plot_avg(hb_slc1', handles.params.ts, 2); hold on;
+        plot_avg(hb_slc2', handles.params.ts, 1); hold off;
+    end
+    
+end
+disp('+++ Done +++');
+
+function [hb_filt_all, hbo_filt_all] = signalprocessing_all(handles)
+global numchan numtrial hbo hb
+
+% Initialize outputs
+hb_filt_all = zeros(size(hb));
+hbo_filt_all = zeros(size(hbo));
+
+fprintf('Processing all hemoglobin data...');
+for tr = 1:numtrial
+    for ch = 1:numchan
+        % Splitting
+        hb_cur = hb(:, tr, ch);
+        hbo_cur = hbo(:, tr, ch);
+        
+        % Process signals
+        hb_filt = signal_processing(handles, hb_cur);
+        hbo_filt = signal_processing(handles, hbo_cur);
+        
+        % Merging
+        hb_filt_all(:, tr, ch) = hb_filt;
+        hbo_filt_all(:, tr, ch) = hbo_filt;
+    end
+end
+fprintf('Done\n');
+
+function y = signal_processing(handles, x)
+% parameters
+Fs = handles.params.Fs;
+bandpassFc = str2num(get(handles.edit_bandpassFc, 'String'));   % [highpassFc lowpassFc]
+mva_val = str2double(get(handles.edit_mva_val, 'String'));         % moving average
+span = str2double(get(handles.edit_span, 'String'));
+
+% Bandpass filter
+[b, a] = ellip(4, 0.1, 40, bandpassFc*2/Fs);   % This set of parameter is optimized for our study by trial-and-error, don't ask!
+x = filtfilt(b, a, x);
+
+% Moving average
+a = 1;
+b(1:ceil(Fs*mva_val)) = 1 / (Fs*mva_val);
+x = filtfilt(b, a, x);
+
+% Smoothing
+x = smooth(x, span);
+
+% Zero shifting
+y = bsxfun(@minus, x', x(1))';
+
+% ======================= For DEBUGGING ==================================
+% Plot hbo and hb of one (trial, channel)
+function plot_single(hbdata, hbodata, trial, channel)
+figure;
+plot(hbdata(:, trial, channel)); hold on;
+plot(hbodata(:, trial, channel), 'r-'); hold off;
+
+
+% --- Executes on selection change in lb_label2.
+function lb_label2_Callback(hObject, eventdata, handles)
+% hObject    handle to lb_label2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns lb_label2 contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from lb_label2
+
+
+% --- Executes during object creation, after setting all properties.
+function lb_label2_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to lb_label2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: listbox controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on selection change in lb_hbtype.
+function lb_hbtype_Callback(hObject, eventdata, handles)
+% hObject    handle to lb_hbtype (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns lb_hbtype contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from lb_hbtype
+
+
+% --- Executes during object creation, after setting all properties.
+function lb_hbtype_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to lb_hbtype (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: listbox controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
