@@ -22,7 +22,7 @@ function varargout = GUI_project(varargin)
 
 % Edit the above text to modify the response to help GUI_project
 
-% Last Modified by GUIDE v2.5 04-Jan-2017 14:48:17
+% Last Modified by GUIDE v2.5 04-Jan-2017 17:45:36
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -56,6 +56,7 @@ function GUI_project_OpeningFcn(hObject, eventdata, handles, varargin)
 handles.output = hObject;
 handles.params.ts = 0.055;  % TODO: load param from file
 handles.params.Fs = 1/handles.params.ts;
+handles.ylim_interval = str2num(get(handles.edit_ylim, 'String'));
 
 % ================= add depedencies ==============================
 path_vis = './functions/visualization';
@@ -264,7 +265,9 @@ plot_raw_signal(handles, i)
 function plot_raw_signal(handles, i)
 % ===============================================-=========================
 global numchan numtrial hb hbo label numsamp
+
 % =========================================================================
+ylim_interval = handles.ylim_interval;
 
 %% ======================== checking choosen file =========================
 getfile = get(handles.browserfile_edit,'String');
@@ -302,7 +305,7 @@ else
             eval(sprintf('hb_cur = hb(:,%d,%d);', i, j));
             eval(sprintf('hbo_cur = hbo(:,%d,%d);', i, j));
             a = sprintf('hp%d = plot(ha%d, hb_cur); hold(ha%d, ''on'');', j,j,j);
-            b = sprintf('hp%d = plot(ha%d, hbo_cur, ''r-''); xlim(ha%d, [0 numsamp]);', j,j,j);
+            b = sprintf('hp%d = plot(ha%d, hbo_cur, ''r-''); xlim(ha%d, [0 numsamp]); ylim(ha%d, ylim_interval);', j,j,j,j);
             eval(a);
             eval(b);
             
@@ -314,7 +317,7 @@ else
             % all data in channel (%d+numchan) of variable hbo and hb in trial i
             %and hanled them by hp(%d+numchan)
             c = sprintf('hp%d = plot(ha%d, hb_filt); hold(ha%d, ''on'');', j+numchan,j+numchan,j+numchan);
-            d = sprintf('hp%d = plot(ha%d, hbo_filt, ''r-''); xlim(ha%d, [0 numsamp]);', j+numchan,j+numchan, j+numchan);
+            d = sprintf('hp%d = plot(ha%d, hbo_filt, ''r-''); xlim(ha%d, [0 numsamp]); ylim(ha%d, ylim_interval);', j+numchan,j+numchan, j+numchan, j+numchan);
             eval(c);
             eval(d);
             
@@ -470,7 +473,13 @@ function pb_plot_mean_Callback(hObject, eventdata, handles)
 % hObject    handle to pb_plot_mean (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-global label numchan
+global label numchan numtrial
+
+ylim_interval = handles.ylim_interval;
+
+trials_interval = zeros(numtrial, 1);
+trials_interval(str2num(get(handles.edit_trials, 'String'))) = 1;
+
 
 %% ======================== PROCESS DATA =====================
 [hb_filt_all, hbo_filt_all] = signalprocessing_all(handles);
@@ -480,24 +489,25 @@ all_labels = get(handles.lb_label1, 'String');
 slc_label1 = all_labels(get(handles.lb_label1, 'Value'));
 slc_label2 = all_labels(get(handles.lb_label2, 'Value'));
 
-figure('Name', 'Folded average');
-for ch = 1:numchan
-    subplot(1, numchan, ch);
-    hb_options = get(handles.lb_hbtype, 'String');
-    hb_slc = hb_options(get(handles.lb_hbtype, 'Value'));
+hfig = figure('Name', 'Folded average');
+for ch = 1:numchan   
+    % Axes for oxyHb
+    ax_hbo = sprintf('ha%d = axes(''Parent'',hfig, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.54 (0.95/%d-0.03) 0.45]);',ch,ch,numchan,ch,numchan);
+    eval(ax_hbo);
+    hbo_slc1 = hbo_filt_all(:, ismember(label, slc_label1) & trials_interval, ch);
+    hbo_slc2 = hbo_filt_all(:, ismember(label, slc_label2) & trials_interval, ch);
+    plot_avg(hbo_slc1', handles.params.ts, 2); hold on;
+    plot_avg(hbo_slc2', handles.params.ts, 1); hold off;
+    ylim(ylim_interval);
     
-    if strcmp(hb_slc, 'oxyHb')
-        hbo_slc1 = hbo_filt_all(:, ismember(label, slc_label1), ch);
-        hbo_slc2 = hbo_filt_all(:, ismember(label, slc_label2), ch);
-        plot_avg(hbo_slc1', handles.params.ts, 2); hold on;
-        plot_avg(hbo_slc2', handles.params.ts, 1); hold off;
-    elseif strcmp(hb_slc, 'deoHb')
-        hb_slc1 = hb_filt_all(:, ismember(label, slc_label1), ch);
-        hb_slc2 = hb_filt_all(:, ismember(label, slc_label2), ch);
-        plot_avg(hb_slc1', handles.params.ts, 2); hold on;
-        plot_avg(hb_slc2', handles.params.ts, 1); hold off;
-    end
-    
+    % Axes for deoHb
+    ax_hb = sprintf('ha%d = axes(''Parent'',hfig, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.05 (0.95/%d-0.03) 0.45]);',ch+numchan,ch,numchan,ch,numchan);
+    eval(ax_hb);
+    hb_slc1 = hb_filt_all(:, ismember(label, slc_label1), ch);
+    hb_slc2 = hb_filt_all(:, ismember(label, slc_label2), ch);
+    plot_avg(hb_slc1', handles.params.ts, 2); hold on;
+    plot_avg(hb_slc2', handles.params.ts, 1); hold off; 
+    ylim(ylim_interval);
 end
 disp('+++ Done +++');
 
@@ -596,6 +606,146 @@ function lb_hbtype_CreateFcn(hObject, eventdata, handles)
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: listbox controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on selection change in lb_sessions.
+function lb_sessions_Callback(hObject, eventdata, handles)
+% hObject    handle to lb_sessions (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns lb_sessions contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from lb_sessions
+
+
+% --- Executes during object creation, after setting all properties.
+function lb_sessions_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to lb_sessions (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: listbox controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function edit_ylim_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_ylim (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit_ylim as text
+%        str2double(get(hObject,'String')) returns contents of edit_ylim as a double
+handles.ylim_interval = str2num(get(handles.edit_ylim, 'String'));
+guidata(hObject, handles);
+
+
+% --- Executes during object creation, after setting all properties.
+function edit_ylim_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit_ylim (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function edit_trials_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_trials (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit_trials as text
+%        str2double(get(hObject,'String')) returns contents of edit_trials as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit_trials_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit_trials (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function edit_rest1_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_rest1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit_rest1 as text
+%        str2double(get(hObject,'String')) returns contents of edit_rest1 as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit_rest1_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit_rest1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function edit_task_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_task (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit_task as text
+%        str2double(get(hObject,'String')) returns contents of edit_task as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit_task_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit_task (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function edit_rest2_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_rest2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit_rest2 as text
+%        str2double(get(hObject,'String')) returns contents of edit_rest2 as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit_rest2_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit_rest2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
