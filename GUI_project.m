@@ -58,6 +58,7 @@ handles.params.ts = 0.055;  % TODO: load param from file
 handles.params.Fs = 1/handles.params.ts;
 handles.ylim_interval = str2num(get(handles.edit_ylim, 'String'));
 
+
 % ================= add depedencies ==============================
 path_vis = './functions/visualization';
 disp('+++ Add path +++');
@@ -115,18 +116,48 @@ else
     loadvar = load(fullfilename);                           
     set(handles.browserfile_edit,'String',fullfilename);    %show link of data file
 
-%% ======================= get number of channel ==========================
+%% ======================= Experiment info ==========================
+    % General
     hbo = loadvar.hbo;                      %file data contain variable hbo, hb, label
     hb = loadvar.hb;
     label = loadvar.label;
-%     numchan = length(hbo(1,1,2:end));
     numchan = size(hbo, 3);
     numtrial = size(hbo, 2);
     numsamp = size(hbo, 1);
-
+    filenamesplit = strsplit(filename, '_');
+    handles.params.subjectName = filenamesplit{1};
+    
+    % Time
+    rest1time = str2double(get(handles.edit_rest1, 'String'));
+    tasktime = str2double(get(handles.edit_task, 'String'));
+    ts = handles.params.ts;
+    time = [1:numsamp]*ts;
+    handles.params.time = time;
+    try
+        handles.params.rest2task = time(ceil(rest1time/ts));
+    catch ME
+        if strcmp(ME.identifier, 'MATLAB:badsubscript')
+            warning('The rest1''s time is zero');
+            handles.params.rest2task = [];
+        end
+%         rethrow(ME);
+    end
+    handles.params.task2rest = time(ceil((rest1time + tasktime)/ts));
+    
+%% =========================== Update GUI =================================
+    % Numtrial
     set(handles.numtrial_text,'String',num2str(numtrial));
+    
+    % Listboxes
+    list_labels = unique(cellstr(label));
+    set(handles.lb_label1,'String', list_labels);
+    set(handles.lb_label2,'String', list_labels);
+    
+    % Update handles structure
+    guidata(hObject, handles);
+    
 
-%% =============== create all axes (= number of channel) ==================
+%% =============== Create all axes (= number of channel) ==================
     hpanelvis = uipanel('Title','Signal','Position',[0.16 0.01 0.83 0.97]);
 
     % ha%d (%d = 1 2 3 4 5 6 7):            is handles of axes of before fitler
@@ -154,11 +185,6 @@ else
         eval(public_ha_after);
         eval(after);
     end
-    
-    % ============== Set up listbox ==================================
-    list_labels = unique(cellstr(label));
-    set(handles.lb_label1,'String', list_labels);
-    set(handles.lb_label2,'String', list_labels);
 end
 
 
@@ -475,6 +501,7 @@ function pb_plot_mean_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 global label numchan numtrial
 
+task2rest = handles.params.task2rest;
 ylim_interval = handles.ylim_interval;
 
 trials_interval = zeros(numtrial, 1);
@@ -490,25 +517,43 @@ slc_label1 = all_labels(get(handles.lb_label1, 'Value'));
 slc_label2 = all_labels(get(handles.lb_label2, 'Value'));
 
 hfig = figure('Name', 'Folded average');
+hpanel = uipanel('Title','','Position',[0.01 0.01 0.97 0.9], ...
+                'BackgroundColor', [1 1 1], 'BorderType', 'none', 'Parent', hfig);
 for ch = 1:numchan   
     % Axes for oxyHb
-    ax_hbo = sprintf('ha%d = axes(''Parent'',hfig, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.54 (0.95/%d-0.03) 0.45]);',ch,ch,numchan,ch,numchan);
+    ax_hbo = sprintf('ha%d = axes(''Parent'',hpanel, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.54 (0.95/%d-0.03) 0.45]);',ch,ch,numchan,ch,numchan);
     eval(ax_hbo);
     hbo_slc1 = hbo_filt_all(:, ismember(label, slc_label1) & trials_interval, ch);
     hbo_slc2 = hbo_filt_all(:, ismember(label, slc_label2) & trials_interval, ch);
     plot_avg(hbo_slc1', handles.params.ts, 2); hold on;
     plot_avg(hbo_slc2', handles.params.ts, 1); hold off;
-    ylim(ylim_interval);
+    if ~isempty(handles.params.rest2task)
+    rest2task = handles.params.rest2task;
+    line([rest2task rest2task], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
+    end
+    line([task2rest task2rest], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
+    xlim([0, handles.params.time(end)]), ylim(ylim_interval);
+    set(gca, 'Ygrid', 'on');
     
     % Axes for deoHb
-    ax_hb = sprintf('ha%d = axes(''Parent'',hfig, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.05 (0.95/%d-0.03) 0.45]);',ch+numchan,ch,numchan,ch,numchan);
+    ax_hb = sprintf('ha%d = axes(''Parent'',hpanel, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.05 (0.95/%d-0.03) 0.45]);',ch+numchan,ch,numchan,ch,numchan);
     eval(ax_hb);
     hb_slc1 = hb_filt_all(:, ismember(label, slc_label1), ch);
     hb_slc2 = hb_filt_all(:, ismember(label, slc_label2), ch);
     plot_avg(hb_slc1', handles.params.ts, 2); hold on;
-    plot_avg(hb_slc2', handles.params.ts, 1); hold off; 
-    ylim(ylim_interval);
+    plot_avg(hb_slc2', handles.params.ts, 1); hold off;
+    if ~isempty(handles.params.rest2task)
+    line([rest2task rest2task], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
+    end
+    line([task2rest task2rest], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
+    xlim([0, handles.params.time(end)]), ylim(ylim_interval);
+    set(gca, 'Ygrid', 'on');
 end
+
+htext = uicontrol('Style', 'text', 'Units', 'normalized', 'Position', [0.2, 0.92, 0.6, 0.05], 'Parent', hfig, ...
+                  'String', sprintf('Subject: %s | Labels: %s (blue) & %s (red) | Trials: %s', ...
+                  handles.params.subjectName, slc_label1{:}, slc_label2{:}, get(handles.edit_trials, 'String')), ...
+                  'FontSize', 12, 'FontWeight', 'bold', 'BackgroundColor', [1 1 1]);
 disp('+++ Done +++');
 
 function [hb_filt_all, hbo_filt_all] = signalprocessing_all(handles)
