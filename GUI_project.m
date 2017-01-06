@@ -22,7 +22,7 @@ function varargout = GUI_project(varargin)
 
 % Edit the above text to modify the response to help GUI_project
 
-% Last Modified by GUIDE v2.5 30-Dec-2016 20:00:00
+% Last Modified by GUIDE v2.5 04-Jan-2017 10:13:19
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -89,13 +89,14 @@ function browser_file_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 %% ========================= declare variable =============================
-global numchan numtrail hbo hb label i
+global numchan numtrial numsamp hbo hb label i
 % numchan:      number of channel
-% numtrail:     number of trail
+% numtrail:     number of trial
+% numsamp:      number of sample in a trial
 % hbo:          data oxygenated hemoglobin
 % hb:           data deoxygenated hemoglobin
-%label:         data label of trail
-% i:            show number of trail is plotted now (default = 1)
+%label:         data label of trial
+% i:            show number of trial is plotted now (default = 1)
 
 i = 0;
 
@@ -110,13 +111,18 @@ else
     set(handles.browserfile_edit,'String',fullfilename);    %show link of data file
 
 %% ======================= get number of channel ==========================
-    hbo = loadvar.hbo;                      %file data contain variable hbo, hb, label
-    hb = loadvar.hb;
+    hbo = loadvar.hbo(:,2:end);                      %file data contain variable hbo, hb, label
+    hb = loadvar.hb(:,2:end);
     label = loadvar.label;
-    numchan = length(hbo(1,1,2:end));
-    numtrail = length(hbo(1,:,1));
+    numchan = length(hbo(1,:));
+    numtrial = length(label);
+    numsamp = length(hbo(:,1))/numtrial;
+    
+    %reshape variable
+    hbo = reshape(hbo,[numsamp, numtrial, numchan]);
+    hb = reshape(hb,[numsamp, numtrial, numchan]);
 
-    set(handles.numtrail_text,'String',num2str(numtrail));
+    set(handles.numtrail_text,'String',num2str(numtrial));
 
 %% =============== create all axes (= number of channel) ==================
     hpanelvis = uipanel('Title','Signal','Position',[0.16 0.01 0.83 0.97]);
@@ -156,13 +162,14 @@ function browserfile_edit_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 %% ========================= declare variable =============================
-global numchan numtrail hbo hb label i
+global numchan numtrial numsamp hbo hb label i
 % numchan:      number of channel
-% numtrail:     number of trail
+% numtrail:     number of trial
+% numsamp:      number of elements in a trial
 % hbo:          data oxygenated hemoglobin
 % hb:           data deoxygenated hemoglobin
-%label:         data label of trail
-% i:            show number of trail is plotted now (default = 1)
+%label:         data label of trial
+% i:            show number of trial is plotted now (default = 1)
 
 i = 0;
 
@@ -174,13 +181,18 @@ elseif exist(fullfilename,'file') == 2;
     loadvar = load(fullfilename);                           
     set(handles.message_text,'String','');
 %% ======================= get number of channel ==========================
-    hbo = loadvar.hbo;                      %file data contain variable hbo, hb, label
-    hb = loadvar.hb;
+    hbo = loadvar.hbo(:,2:end);                      %file data contain variable hbo, hb, label
+    hb = loadvar.hb(:,2:end);
     label = loadvar.label;
-    numchan = length(hbo(1,1,2:end));
-    numtrail = length(hbo(1,:,1));
+    numchan = length(hbo(1,:));
+    numtrial = length(label);
+    numsamp = length(hbo(:,1))/numtrial;
+    
+    %reshape variable
+    hbo = reshape(hbo,[numsamp, numtrial, numchan]);
+    hb = reshape(hb,[numsamp, numtrial, numchan]);
 
-    set(handles.numtrail_text,'String',num2str(numtrail));
+    set(handles.numtrail_text,'String',num2str(numtrial));
 
 %% =============== create all axes (= number of channel) ==================
     hpanelvis = uipanel('Title','Signal','Position',[0.16 0.01 0.83 0.97]);
@@ -251,7 +263,7 @@ else
     set(handles.message_text,'String','');
     
     if i <= 0;          %check value of i, if i <= 0 disp error, else plotting
-        set(handles.message_text,'String','plotting first trail');
+        set(handles.message_text,'String','plotting first trial');
         i = min;
     else
         set(handles.trail_text,'String',num2str(i));    %display number of current trail
@@ -271,15 +283,15 @@ else
         %% start plot
             %plot all data in channel %d of variable hbo and hb in trail i 
             %and hanled them by hp%d 
-            a = sprintf('hp%d = plot(ha%d,hb(:,%d,%d));hold(ha%d,''on'');', j,j,i,j+1,j);
-            b = sprintf('hp%d = plot(ha%d,hbo(:,%d,%d));', j,j,i,j+1); 
+            a = sprintf('hp%d = plot(ha%d,hb(:,%d,%d));hold(ha%d,''on'');', j,j,i,j,j);
+            b = sprintf('hp%d = plot(ha%d,hbo(:,%d,%d));', j,j,i,j); 
             eval(a);
             eval(b);
 
             %plot all data in channel (%d+numchan) of variable hbo and hb in trail i 
             %and hanled them by hp(%d+numchan) 
-            c = sprintf('hp%d = plot(ha%d,hb(:,%d,%d));hold(ha%d,''on'');', j+numchan,j+numchan,i,j+1,j+numchan);
-            d = sprintf('hp%d = plot(ha%d,hbo(:,%d,%d));', j+numchan,j+numchan,i,j+1);
+            c = sprintf('hp%d = plot(ha%d,hb(:,%d,%d));hold(ha%d,''on'');', j+numchan,j+numchan,i,j,j+numchan);
+            d = sprintf('hp%d = plot(ha%d,hbo(:,%d,%d));', j+numchan,j+numchan,i,j);
             eval(c);
             eval(d);
         end
@@ -293,10 +305,10 @@ function next_button_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 %% ========================= Declare variable =============================
-global numchan numtrail hb hbo label i
+global numchan numtrial hb hbo label i
 
 i = i + 1;                                      %next 1 trail
-max = numtrail;    %used to restore the value fo i when plotting the last trail
+max = numtrial;    %used to restore the value fo i when plotting the last trail
 
 %% ======================== checking choosen file =========================
 getfile = get(handles.browserfile_edit,'String');
@@ -307,7 +319,7 @@ else
 %% ============================ Start plotting ============================
     set(handles.message_text,'String','');
     
-    if i > numtrail;       %check value of i, if i >= numtrail disp error, else plotting
+    if i > numtrial;       %check value of i, if i >= numtrail disp error, else plotting
         set(handles.message_text,'String','No more trail to plot');
         i = max;
     else
@@ -328,15 +340,15 @@ else
         %% start plot
             %plot all data in channel %d of variable hbo and hb in trail i 
             %and hanled them by hp%d 
-            a = sprintf('hp%d = plot(ha%d,hb(:,%d,%d));hold(ha%d,''on'');', j,j,i,j+1,j);
-            b = sprintf('hp%d = plot(ha%d,hbo(:,%d,%d));', j,j,i,j+1); 
+            a = sprintf('hp%d = plot(ha%d,hb(:,%d,%d));hold(ha%d,''on'');', j,j,i,j,j);
+            b = sprintf('hp%d = plot(ha%d,hbo(:,%d,%d));', j,j,i,j); 
             eval(a);
             eval(b);
 
             %plot all data in channel (%d+numchan) of variable hbo and hb in trail i 
             %and hanled them by hp(%d+numchan)
-            c = sprintf('hp%d = plot(ha%d,hb(:,%d,%d));hold(ha%d,''on'');', j+numchan,j+numchan,i,j+1,j+numchan);
-            d = sprintf('hp%d = plot(ha%d,hbo(:,%d,%d));', j+numchan,j+numchan,i,j+1);
+            c = sprintf('hp%d = plot(ha%d,hb(:,%d,%d));hold(ha%d,''on'');', j+numchan,j+numchan,i,j,j+numchan);
+            d = sprintf('hp%d = plot(ha%d,hbo(:,%d,%d));', j+numchan,j+numchan,i,j);
             eval(c);
             eval(d);
 
@@ -372,3 +384,11 @@ function message_text_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to message_text (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
+
+
+% --------------------------------------------------------------------
+function convert_file_Callback(hObject, eventdata, handles)
+% hObject    handle to convert_file (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+run Conversion
