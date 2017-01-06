@@ -22,7 +22,7 @@ function varargout = GUI_project(varargin)
 
 % Edit the above text to modify the response to help GUI_project
 
-% Last Modified by GUIDE v2.5 04-Jan-2017 17:45:36
+% Last Modified by GUIDE v2.5 06-Jan-2017 15:53:40
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -507,6 +507,10 @@ ylim_interval = handles.ylim_interval;
 trials_interval = zeros(numtrial, 1);
 trials_interval(str2num(get(handles.edit_trials, 'String'))) = 1;
 
+time = handles.params.time;
+
+isplotfill = get(handles.cb_fill_variance, 'Value');
+
 
 %% ======================== PROCESS DATA =====================
 [hb_filt_all, hbo_filt_all] = signalprocessing_all(handles);
@@ -516,7 +520,7 @@ all_labels = get(handles.lb_label1, 'String');
 slc_label1 = all_labels(get(handles.lb_label1, 'Value'));
 slc_label2 = all_labels(get(handles.lb_label2, 'Value'));
 
-hfig = figure('Name', 'Folded average');
+hfig = figure('Name', 'Folded average', 'Color', [1 1 1]);
 hpanel = uipanel('Title','','Position',[0.01 0.01 0.97 0.9], ...
                 'BackgroundColor', [1 1 1], 'BorderType', 'none', 'Parent', hfig);
 for ch = 1:numchan   
@@ -525,11 +529,21 @@ for ch = 1:numchan
     eval(ax_hbo);
     hbo_slc1 = hbo_filt_all(:, ismember(label, slc_label1) & trials_interval, ch);
     hbo_slc2 = hbo_filt_all(:, ismember(label, slc_label2) & trials_interval, ch);
-    plot_avg(hbo_slc1', handles.params.ts, 2); hold on;
-    plot_avg(hbo_slc2', handles.params.ts, 1); hold off;
+    if isplotfill
+        plot_avg(hbo_slc1', handles.params.ts, 2); hold on;
+        plot_avg(hbo_slc2', handles.params.ts, 1); hold off;
+    else
+        mean_slc1 = mean(hbo_slc1');
+        mean_slc2 = mean(hbo_slc2');
+        hold on;
+        plot(time, hbo_slc1, 'Color', [0.5 0.5 1]);  plot(time, mean_slc1, 'b-', 'LineWidth',2);
+        plot(time, hbo_slc2, 'Color', [1 0.5 0.5]);  plot(time, mean_slc2, 'r-', 'LineWidth',2);
+        hold off;
+    end
+        
     if ~isempty(handles.params.rest2task)
-    rest2task = handles.params.rest2task;
-    line([rest2task rest2task], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
+        rest2task = handles.params.rest2task;
+        line([rest2task rest2task], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
     end
     line([task2rest task2rest], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
     xlim([0, handles.params.time(end)]), ylim(ylim_interval);
@@ -540,10 +554,20 @@ for ch = 1:numchan
     eval(ax_hb);
     hb_slc1 = hb_filt_all(:, ismember(label, slc_label1), ch);
     hb_slc2 = hb_filt_all(:, ismember(label, slc_label2), ch);
-    plot_avg(hb_slc1', handles.params.ts, 2); hold on;
-    plot_avg(hb_slc2', handles.params.ts, 1); hold off;
+    if isplotfill
+        plot_avg(hb_slc1', handles.params.ts, 2); hold on;
+        plot_avg(hb_slc2', handles.params.ts, 1); hold off;
+    else
+        hold on;
+        mean_slc1 = mean(hb_slc1');
+        mean_slc2 = mean(hb_slc2');
+        plot(time, hb_slc1, 'Color', [0.5 0.5 1]);  plot(time, mean_slc1, 'b-', 'LineWidth',2);
+        plot(time, hb_slc2, 'Color', [1 0.5 0.5]);  plot(time, mean_slc2, 'r-', 'LineWidth',2);
+        hold off;
+    end
+
     if ~isempty(handles.params.rest2task)
-    line([rest2task rest2task], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
+        line([rest2task rest2task], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
     end
     line([task2rest task2rest], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
     xlim([0, handles.params.time(end)]), ylim(ylim_interval);
@@ -795,3 +819,14 @@ function edit_rest2_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in cb_fill_variance.
+function cb_fill_variance_Callback(hObject, eventdata, handles)
+% hObject    handle to cb_fill_variance (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of cb_fill_variance
+cb_fill_val = get(hObject, 'Value');
+% disp(cb_fill_val);
