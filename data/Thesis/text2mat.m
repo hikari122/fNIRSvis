@@ -20,18 +20,18 @@ hbtype = 'oxyHb';                                   % Selected by user
 hbo_temp_all = dlmread(strcat(subject, hbtype,'.TXT'), ' ');                      % First colum = period marker: 0 = rest1, 1 = task, 2 = rest2       
 % hbo_temp = hbo_temp_all(hbo_temp_all(:,1)==1 , 2:end);                          % task only
 % hbo_temp = hbo_temp_all(hbo_temp_all(:,1)==1 | hbo_temp_all(:,1)==2 , 2:end); % task and post-task
-hbo = hbo_temp_all(:, 2:end);                                            % all
-% numsamp  = size(hbo_temp,1)/numtrial;   % # of samples in 1 trial
-% hboAll = reshape(hbo_temp, [numsamp, numtrial, size(hbo_temp,2)]);
+hbo_temp = hbo_temp_all(:, 2:end);                                            % all
+numsamp  = size(hbo_temp,1)/numtrial;   % # of samples in 1 trial
+hbo = reshape(hbo_temp, [numsamp, numtrial, size(hbo_temp,2)]);
 
 % ------------------------- Load deo-Hb -------------------------
 hbtype = 'deoHb';                                   % Selected by user
 hb_temp_all = dlmread(strcat(subject, hbtype,'.TXT'), ' ');                      % First colum = period marker: 0 = rest1, 1 = task, 2 = rest2       
 % hbo_temp = hbo_temp_all(hbo_temp_all(:,1)==1 , 2:end);                          % task only
 % hbo_temp = hbo_temp_all(hbo_temp_all(:,1)==1 | hbo_temp_all(:,1)==2 , 2:end); % task and post-task
-hb = hbo_temp_all(:, 2:end);                                            % all
-% numsamp  = size(hbo_temp,1)/numtrial;   % # of samples in 1 trial
-% hboAll = reshape(hbo_temp, [numsamp, numtrial, size(hbo_temp,2)]);
+hb_temp = hb_temp_all(:, 2:end);                                            % all
+numsamp  = size(hb_temp,1)/numtrial;   % # of samples in 1 trial
+hb = reshape(hb_temp, [numsamp, numtrial, size(hb_temp,2)]);
 
 %% ============= SAVE DATA ========================
 save(sprintf('%sall.mat', subject), 'hb', 'hbo', 'label');
