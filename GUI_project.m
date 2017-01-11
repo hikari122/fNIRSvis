@@ -22,7 +22,7 @@ function varargout = GUI_project(varargin)
 
 % Edit the above text to modify the response to help GUI_project
 
-% Last Modified by GUIDE v2.5 07-Jan-2017 09:52:15
+% Last Modified by GUIDE v2.5 10-Jan-2017 16:22:42
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -61,7 +61,9 @@ handles.ylim_interval = str2num(get(handles.edit_ylim, 'String'));
 
 % ================= add depedencies ==============================
 path_vis = './functions/visualization';
+path_gui = './functions/guifunc';
 disp('+++ Add path +++');
+fprintf('+ GUI: %s\n', path_gui);           addpath(path_gui);
 fprintf('+ Visualization: %s\n', path_vis); addpath(path_vis);
 disp('+++ Done +++++++');
 % Update handles structure
@@ -154,6 +156,7 @@ else
     set(handles.lb_label2,'String', list_labels);
     
     % Update handles structure
+    handles.list_labels = list_labels;
     guidata(hObject, handles);
     
 
@@ -516,57 +519,72 @@ isplotfill = get(handles.cb_fill_variance, 'Value');
 [hb_filt_all, hbo_filt_all] = signalprocessing_all(handles);
 
 disp('+++ Start ploting folded average +++');
-all_labels = get(handles.lb_label1, 'String');
+all_labels = handles.list_labels;
 slc_label1 = all_labels(get(handles.lb_label1, 'Value'));
 slc_label2 = all_labels(get(handles.lb_label2, 'Value'));
 
 hfig = figure('Name', 'Folded average', 'Color', [1 1 1]);
 hpanel = uipanel('Title','','Position',[0.01 0.01 0.97 0.9], ...
                 'BackgroundColor', [1 1 1], 'BorderType', 'none', 'Parent', hfig);
+            
+% Select datatype to plot
+slc_datatype = get(handles.pnl_datatype, 'SelectedObject');
+
 for ch = 1:numchan   
     % Axes for oxyHb
     ax_hbo = sprintf('ha%d = axes(''Parent'',hpanel, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.54 (0.95/%d-0.03) 0.45]);',ch,ch,numchan,ch,numchan);
     eval(ax_hbo);
+    
+    % Plot according to data type selection
     hbo_slc1 = hbo_filt_all(:, ismember(label, slc_label1) & trials_interval, ch);
     hbo_slc2 = hbo_filt_all(:, ismember(label, slc_label2) & trials_interval, ch);
-    if isplotfill
-        plot_avg(hbo_slc1', handles.params.ts, 2); hold on;
-        plot_avg(hbo_slc2', handles.params.ts, 1); hold off;
-    else
-        mean_slc1 = mean(hbo_slc1');
-        mean_slc2 = mean(hbo_slc2');
-        hold on;
-        plot(time, hbo_slc1, 'Color', [0.5 0.5 1]);  plot(time, mean_slc1, 'b-', 'LineWidth',2);
-        plot(time, hbo_slc2, 'Color', [1 0.5 0.5]);  plot(time, mean_slc2, 'r-', 'LineWidth',2);
-        hold off;
+    hb_slc1 = hb_filt_all(:, ismember(label, slc_label1) & trials_interval, ch);
+    hb_slc2 = hb_filt_all(:, ismember(label, slc_label2) & trials_interval, ch);
+    slc_string = get(slc_datatype, 'String');
+    switch slc_string
+        case 'oxyHb'
+            if isplotfill
+                plot_avg(hbo_slc1', handles.params.ts, 2); hold on;
+                plot_avg(hbo_slc2', handles.params.ts, 1); hold off;
+            else
+                mean_slc1 = mean(hbo_slc1');
+                mean_slc2 = mean(hbo_slc2');
+                hold on;
+                plot(time, hbo_slc1, 'Color', [0.5 0.5 1]);  plot(time, mean_slc1, 'b-', 'LineWidth',2);
+                plot(time, hbo_slc2, 'Color', [1 0.5 0.5]);  plot(time, mean_slc2, 'r-', 'LineWidth',2);
+                hold off;
+            end
+        case 'deoHb'
+            if isplotfill
+                plot_avg(hb_slc1', handles.params.ts, 2); hold on;
+                plot_avg(hb_slc2', handles.params.ts, 1); hold off;
+            else
+                hold on;
+                mean_slc1 = mean(hb_slc1');
+                mean_slc2 = mean(hb_slc2');
+                plot(time, hb_slc1, 'Color', [0.5 0.5 1]);  plot(time, mean_slc1, 'b-', 'LineWidth',2);
+                plot(time, hb_slc2, 'Color', [1 0.5 0.5]);  plot(time, mean_slc2, 'r-', 'LineWidth',2);
+                hold off;
+            end
+        case 'Blood Oxy'
+            oxy_slc1 = hbo_slc1 - hb_slc1;
+            oxy_slc2 = hbo_slc2 - hb_slc2;
+            if isplotfill
+                plot_avg(oxy_slc1', handles.params.ts, 2); hold on;
+                plot_avg(oxy_slc2', handles.params.ts, 1); hold off;
+            else
+                hold on;
+                mean_slc1 = mean(oxy_slc1');
+                mean_slc2 = mean(oxy_slc2');
+                plot(time, oxy_slc1, 'Color', [0.5 0.5 1]);  plot(time, mean_slc1, 'b-', 'LineWidth',2);
+                plot(time, oxy_slc2, 'Color', [1 0.5 0.5]);  plot(time, mean_slc2, 'r-', 'LineWidth',2);
+                hold off;
+            end
     end
-        
+    
+    % Decoration
     if ~isempty(handles.params.rest2task)
         rest2task = handles.params.rest2task;
-        line([rest2task rest2task], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
-    end
-    line([task2rest task2rest], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
-    xlim([0, handles.params.time(end)]), ylim(ylim_interval);
-    set(gca, 'Ygrid', 'on');
-    
-    % Axes for deoHb
-    ax_hb = sprintf('ha%d = axes(''Parent'',hpanel, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.05 (0.95/%d-0.03) 0.45]);',ch+numchan,ch,numchan,ch,numchan);
-    eval(ax_hb);
-    hb_slc1 = hb_filt_all(:, ismember(label, slc_label1), ch);
-    hb_slc2 = hb_filt_all(:, ismember(label, slc_label2), ch);
-    if isplotfill
-        plot_avg(hb_slc1', handles.params.ts, 2); hold on;
-        plot_avg(hb_slc2', handles.params.ts, 1); hold off;
-    else
-        hold on;
-        mean_slc1 = mean(hb_slc1');
-        mean_slc2 = mean(hb_slc2');
-        plot(time, hb_slc1, 'Color', [0.5 0.5 1]);  plot(time, mean_slc1, 'b-', 'LineWidth',2);
-        plot(time, hb_slc2, 'Color', [1 0.5 0.5]);  plot(time, mean_slc2, 'r-', 'LineWidth',2);
-        hold off;
-    end
-
-    if ~isempty(handles.params.rest2task)
         line([rest2task rest2task], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
     end
     line([task2rest task2rest], [-0.05, 0.06], 'Color', [0 0.8 0], 'LineStyle', '--', 'LineWidth', 2);  % comment when not whole data is used
@@ -575,8 +593,8 @@ for ch = 1:numchan
 end
 
 htext = uicontrol('Style', 'text', 'Units', 'normalized', 'Position', [0.2, 0.92, 0.6, 0.05], 'Parent', hfig, ...
-                  'String', sprintf('Subject: %s | Labels: %s (blue) & %s (red) | Trials: %s', ...
-                  handles.params.subjectName, slc_label1{:}, slc_label2{:}, get(handles.edit_trials, 'String')), ...
+                  'String', sprintf('Subject: %s | Labels: %s (blue) & %s (red) | Trials: %s | Type: %s', ...
+                  handles.params.subjectName, slc_label1{:}, slc_label2{:}, get(handles.edit_trials, 'String'), slc_string), ...
                   'FontSize', 12, 'FontWeight', 'bold', 'BackgroundColor', [1 1 1]);
 disp('+++ Done +++');
 
@@ -838,3 +856,46 @@ function convert_file_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 run Conversion.m
+
+
+% --------------------------------------------------------------------
+function tools_menu_Callback(hObject, eventdata, handles)
+% hObject    handle to tools_menu (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function bloodOxygen_menu_Callback(hObject, eventdata, handles)
+% hObject    handle to bloodOxygen_menu (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global label numchan hb hbo
+
+% Filter signals
+[hb_filt_all, hbo_filt_all] = signalprocessing_all(handles);
+
+% Calc. Blood oxygenation
+oxy_all = hbo_filt_all - hb_filt_all;
+
+% Averaging across all labels (classess)
+list_labels = handles.list_labels;
+numlabels = length(list_labels);
+oxy_avg = zeros(numchan, numlabels);    % Initialize ouput
+for i = 1:numlabels
+    cur_label = list_labels(i);                             % select each label one by one
+    oxy_label = oxy_all(:, ismember(label, cur_label), :);  % extract oxygenation data accordingly
+    oxy_avg(:,i) =  permute(mean(mean(oxy_label,2)), [3 2 1]);
+end
+% varname = strcat(handles.params.subjectName, '_oxy_avg');
+% assignin ('base', varname, oxy_avg)
+
+% Save to xlsx file
+% fprintf('Save result to xlsx file ...');
+% xlswrite(strcat(varname, '.xlsx'), oxy_avg);
+% fprintf('Done\n');
+
+% Bring raw hemoglobin data to workspace
+rawoxy_all = hbo - hb;
+varname = strcat(handles.params.subjectName, '_oxy_raw');
+assignin ('base', varname, rawoxy_all)
