@@ -104,7 +104,7 @@ global numchan numtrial hbo hb label i numsamp
 % hbo:          data oxygenated hemoglobin
 % hb:           data deoxygenated hemoglobin
 %label:         data label of trial
-% i:            show number of trial is plotted now (default = 1)
+% i:            show number of trial is plotted now (default = 0)
 
 i = 0;
 
@@ -112,9 +112,9 @@ i = 0;
 [filename pathname] = uigetfile({'*.mat'},'File Selector');
 fullfilename = strcat(pathname, filename);
 if isempty(fullfilename) ==1
-    set(handles.message_text,'String','No file chosen');
+    set(handles.text10,'String','Message: No file chosen!');
 else
-    set(handles.message_text,'String','');
+    set(handles.text10,'String','Message:');
     loadvar = load(fullfilename);                           
     set(handles.browserfile_edit,'String',fullfilename);    %show link of data file
 
@@ -177,13 +177,13 @@ else
 
     for j = 1:numchan
         %axes for before filter
-        before = sprintf('ha%d = axes(''Parent'',hpanelvis, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.54 (0.95/%d-0.03) 0.45]);',j,j,numchan,j,numchan);
+        before = sprintf('ha%d = axes(''Parent'',hpanelvis, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.54 (0.95/%d-0.03) 0.45], ''ButtonDownFcn'',{@plot_figure,%d,[0 1],[0 1]});',j,j,numchan,j,numchan,j);
         public_ha_before = sprintf('global ha%d',j);
         eval(public_ha_before);
         eval(before);
 
         %axes for after filter
-        after = sprintf('ha%d = axes(''Parent'',hpanelvis, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.05 (0.95/%d-0.03) 0.45]);',j+numchan,j,numchan,j,numchan);
+        after = sprintf('ha%d = axes(''Parent'',hpanelvis, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.05 (0.95/%d-0.03) 0.45], ''ButtonDownFcn'',{@plot_figure,%d,[0 1],[0 1]});',j+numchan,j,numchan,j,numchan,j+numchan);
         public_ha_after = sprintf('global ha%d',j+numchan);
         eval(public_ha_after);
         eval(after);
@@ -211,10 +211,10 @@ i = 0;
 %% ============================= load file ================================
 fullfilename = get(handles.browserfile_edit,'String');
 if exist(fullfilename,'file') ~= 2
-    set(handles.message_text,'String','file does not exist!');
+    set(handles.text10,'String','Message: file does not exist!');
 elseif exist(fullfilename,'file') == 2;
     loadvar = load(fullfilename);                           
-    set(handles.message_text,'String','');
+    set(handles.text10,'String','Message:');
 %% ======================= get number of channel ==========================
     hbo = loadvar.hbo;                      %file data contain variable hbo, hb, label
     hb = loadvar.hb;
@@ -241,13 +241,13 @@ elseif exist(fullfilename,'file') == 2;
 
     for j = 1:numchan
         %axes for before filter
-        before = sprintf('ha%d = axes(''Parent'',hpanelvis, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.54 (0.95/%d-0.03) 0.45]);',j,j,numchan,j,numchan);
+        before = sprintf('ha%d = axes(''Parent'',hpanelvis, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.54 (0.95/%d-0.03) 0.45], ''ButtonDownFcn'',{@plot_figure,%d,[0 1],[0 1]});',j,j,numchan,j,numchan,j);
         public_ha_before = sprintf('global ha%d',j);
         eval(public_ha_before);
         eval(before);
 
         %axes for after filter
-        after = sprintf('ha%d = axes(''Parent'',hpanelvis, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.05 (0.95/%d-0.03) 0.45]);',j+numchan,j,numchan,j,numchan);
+        after = sprintf('ha%d = axes(''Parent'',hpanelvis, ''Units'',''Normalized'',''Position'', [0.03*%d+(1/%d-0.03)*(%d-1) 0.05 (0.95/%d-0.03) 0.45], ''ButtonDownFcn'',{@plot_figure,%d,[0 1],[0 1]});',j+numchan,j,numchan,j,numchan,j+numchan);
         public_ha_after = sprintf('global ha%d',j+numchan);
         eval(public_ha_after);
         eval(after);
@@ -278,7 +278,7 @@ function back_button_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 global i
-i = i - 1;                                      %next 1 trail
+i = i - 1;                                      %back 1 trail
 plot_raw_signal(handles, i)
 
 % --- Executes on button press in next_button.
@@ -291,9 +291,29 @@ global i
 i = i + 1;                                      %next 1 trail
 plot_raw_signal(handles, i)
 
+
+function plot_figure(hOject,event,numaxes,hb,hbo)
+%numberaxes:    for set name of figure
+%hb:            hb variable
+%hbo:           hbo variable
+global numchan
+
+figure
+plot(hb);
+hold on;
+plot(hbo,'-r');
+if numaxes > numchan
+    numaxes = numaxes - numchan
+    eval(sprintf('title(''channel %d after filter'')',numaxes));
+else
+    eval(sprintf('title(''channel %d before filter'')',numaxes));
+end
+
+
+
 function plot_raw_signal(handles, i)
-% ===============================================-=========================
-global numchan numtrial hb hbo label numsamp
+% =========================================================================
+global numchan numtrial hb hb_cur hb_filt hbo hbo_cur hbo_filt label numsamp
 
 % =========================================================================
 ylim_interval = handles.ylim_interval;
@@ -302,16 +322,16 @@ ylim_interval = handles.ylim_interval;
 getfile = get(handles.browserfile_edit,'String');
 %get state of browser file
 if isempty(getfile) == 1
-    set(handles.message_text,'String','No file chosen');
+    set(handles.text10,'String','Message: No file chosen');
 else
     %% ============================ Start plotting ============================
-    set(handles.message_text,'String','');
+    set(handles.text10,'String','Message:');
     
     if i > numtrial;       %check value of i, if i >= numtrial disp error, else plotting
-        set(handles.message_text,'String','No more trail to plot');
+        set(handles.text10,'String','Message:No more trail to plot');
         i = numtrial;
     elseif i <= 0
-        set(handles.message_text,'String','plotting first trail');
+        set(handles.text10,'String','Message:plotting first trail');
         i = 1;
     else
         set(handles.trial_text,'String',num2str(i));    %display number of current trail
@@ -333,8 +353,8 @@ else
             %and hanled them by hp%d
             eval(sprintf('hb_cur = hb(:,%d,%d);', i, j));
             eval(sprintf('hbo_cur = hbo(:,%d,%d);', i, j));
-            a = sprintf('hp%d = plot(ha%d, hb_cur); hold(ha%d, ''on'');', j,j,j);
-            b = sprintf('hp%d = plot(ha%d, hbo_cur, ''r-''); xlim(ha%d, [0 numsamp]); ylim(ha%d, ylim_interval);', j,j,j,j);
+            a = sprintf('set(ha%d,''ButtonDownFcn'',{@plot_figure,%d,hb_cur,hbo_cur});hold(ha%d, ''on'');hp%d = plot(ha%d, hb_cur,''ButtonDownFcn'',{@plot_figure,%d,hb_cur,hbo_cur});', j,j,j,j,j,j);
+            b = sprintf('hold(ha%d, ''on'');hp%d = plot(ha%d, hbo_cur, ''r-'',''ButtonDownFcn'',{@plot_figure,%d,hb_cur,hbo_cur}); xlim(ha%d, [0 numsamp]); ylim(ha%d, ylim_interval);', j,j,j,j,j,j);
             eval(a);
             eval(b);
             
@@ -345,14 +365,15 @@ else
             % ======================= plot PROCESSED data ================
             % all data in channel (%d+numchan) of variable hbo and hb in trial i
             %and hanled them by hp(%d+numchan)
-            c = sprintf('hp%d = plot(ha%d, hb_filt); hold(ha%d, ''on'');', j+numchan,j+numchan,j+numchan);
-            d = sprintf('hp%d = plot(ha%d, hbo_filt, ''r-''); xlim(ha%d, [0 numsamp]); ylim(ha%d, ylim_interval);', j+numchan,j+numchan, j+numchan, j+numchan);
+            c = sprintf('set(ha%d,''ButtonDownFcn'',{@plot_figure,%d,hb_filt,hbo_filt});hold(ha%d, ''on'');hp%d = plot(ha%d, hb_filt,''ButtonDownFcn'',{@plot_figure,%d,hb_filt,hbo_filt});', j+numchan,j+numchan,j+numchan,j+numchan,j+numchan,j+numchan);
+            d = sprintf('hold(ha%d, ''on'');hp%d = plot(ha%d, hbo_filt, ''r-'',''ButtonDownFcn'',{@plot_figure,%d,hb_filt,hbo_filt}); xlim(ha%d, [0 numsamp]); ylim(ha%d, ylim_interval);', j+numchan,j+numchan,j+numchan, j+numchan,j+numchan, j+numchan);
             eval(c);
             eval(d);
             
         end
     end
 end
+
 
 
 % --- Executes during object creation, after setting all properties.
